@@ -142,7 +142,7 @@ func (r *ConversationRepository) List(ctx context.Context, filter *service.Conve
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []service.ConversationSession{}
 	for rows.Next() {
 		var item service.ConversationSession
@@ -174,7 +174,7 @@ func (r *ConversationRepository) Get(ctx context.Context, id int64) (*service.Co
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []service.ConversationRequest{}
 	for rows.Next() {
 		var item service.ConversationRequest

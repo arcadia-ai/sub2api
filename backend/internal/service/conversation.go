@@ -177,7 +177,7 @@ func (s *ConversationService) worker() {
 		logger.L().Error("conversation.encoder_init_failed", zap.Error(err))
 		return
 	}
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	for {
 		select {
 		case x := <-s.queue:
@@ -447,7 +447,7 @@ func text(v any) string {
 	case []any:
 		var b strings.Builder
 		for _, entry := range x {
-			b.WriteString(text(entry))
+			_, _ = b.WriteString(text(entry))
 		}
 		return b.String()
 	}
