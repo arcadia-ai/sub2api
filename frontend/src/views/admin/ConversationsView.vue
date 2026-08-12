@@ -98,7 +98,11 @@
             <div v-for="(message, index) in request.messages" :key="index" class="flex" :class="message.role === 'assistant' ? 'justify-start' : 'justify-end'">
               <div class="max-w-[88%] rounded-lg px-4 py-3 text-sm leading-6" :class="message.role === 'assistant' ? 'bg-gray-100 text-gray-800 dark:bg-dark-700 dark:text-gray-100' : 'bg-primary-600 text-white'">
                 <div class="mb-1 text-[11px] font-medium uppercase opacity-60">{{ message.role }}<span v-if="message.type"> · {{ message.type }}</span></div>
-                <div class="whitespace-pre-wrap break-words">{{ message.text }}</div>
+                <div
+                  class="conversation-markdown break-words"
+                  :class="message.role === 'assistant' ? 'conversation-markdown-assistant' : 'conversation-markdown-user'"
+                  v-html="renderMarkdown(message.text)"
+                ></div>
               </div>
             </div>
           </div>
@@ -120,6 +124,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -141,6 +147,16 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
 const filters = reactive({ q: '', model: '', status: '' })
+
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
+
+function renderMarkdown(content: string) {
+  if (!content) return ''
+  return DOMPurify.sanitize(marked.parse(content) as string)
+}
 
 async function load() {
   loading.value = true
@@ -205,3 +221,56 @@ function formatNumber(value: number) { return new Intl.NumberFormat(locale.value
 
 onMounted(load)
 </script>
+
+<style scoped>
+.conversation-markdown :deep(> :first-child) {
+  margin-top: 0;
+}
+
+.conversation-markdown :deep(> :last-child) {
+  margin-bottom: 0;
+}
+
+.conversation-markdown :deep(p),
+.conversation-markdown :deep(ul),
+.conversation-markdown :deep(ol),
+.conversation-markdown :deep(blockquote),
+.conversation-markdown :deep(pre),
+.conversation-markdown :deep(table) {
+  @apply mb-3;
+}
+
+.conversation-markdown :deep(h1) { @apply mb-3 mt-4 text-xl font-bold; }
+.conversation-markdown :deep(h2) { @apply mb-2 mt-4 text-lg font-bold; }
+.conversation-markdown :deep(h3) { @apply mb-2 mt-3 text-base font-semibold; }
+.conversation-markdown :deep(h4) { @apply mb-2 mt-3 text-sm font-semibold; }
+.conversation-markdown :deep(ul) { @apply list-disc pl-5; }
+.conversation-markdown :deep(ol) { @apply list-decimal pl-5; }
+.conversation-markdown :deep(li) { @apply my-1 pl-1; }
+.conversation-markdown :deep(a) { @apply break-all font-medium underline underline-offset-2; }
+.conversation-markdown :deep(blockquote) { @apply border-l-4 py-1 pl-3 italic; }
+.conversation-markdown :deep(code) { @apply rounded px-1.5 py-0.5 font-mono text-xs; }
+.conversation-markdown :deep(pre) { @apply max-w-full overflow-x-auto rounded-md p-3; }
+.conversation-markdown :deep(pre code) { @apply bg-transparent p-0 text-inherit; }
+.conversation-markdown :deep(table) { @apply block max-w-full overflow-x-auto border-collapse; }
+.conversation-markdown :deep(th),
+.conversation-markdown :deep(td) { @apply border px-3 py-2 text-left align-top; }
+.conversation-markdown :deep(img) { @apply my-3 max-w-full rounded-md; }
+.conversation-markdown :deep(hr) { @apply my-4 border-0 border-t; }
+
+.conversation-markdown-assistant :deep(a) { @apply text-blue-600 dark:text-blue-400; }
+.conversation-markdown-assistant :deep(blockquote) { @apply border-gray-300 text-gray-600 dark:border-dark-500 dark:text-gray-300; }
+.conversation-markdown-assistant :deep(code) { @apply bg-gray-200 text-pink-700 dark:bg-dark-800 dark:text-pink-300; }
+.conversation-markdown-assistant :deep(pre) { @apply bg-gray-900 text-gray-100; }
+.conversation-markdown-assistant :deep(th),
+.conversation-markdown-assistant :deep(td) { @apply border-gray-300 dark:border-dark-500; }
+.conversation-markdown-assistant :deep(hr) { @apply border-gray-300 dark:border-dark-500; }
+
+.conversation-markdown-user :deep(a) { @apply text-white; }
+.conversation-markdown-user :deep(blockquote) { @apply border-white/50 text-white/90; }
+.conversation-markdown-user :deep(code) { @apply bg-black/20 text-white; }
+.conversation-markdown-user :deep(pre) { @apply bg-black/30 text-white; }
+.conversation-markdown-user :deep(th),
+.conversation-markdown-user :deep(td) { @apply border-white/30; }
+.conversation-markdown-user :deep(hr) { @apply border-white/40; }
+</style>
