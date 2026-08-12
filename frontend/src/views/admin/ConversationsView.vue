@@ -50,7 +50,7 @@
                 <td class="max-w-sm px-5 py-4">
                   <button class="block w-full text-left" @click="openDetail(item.id)">
                     <span class="block truncate font-medium text-gray-900 dark:text-white" :title="item.title">{{ item.title || `#${item.id}` }}</span>
-                    <span class="mt-1 block text-xs text-gray-400">{{ item.merge_source === 'history' ? t('admin.conversations.merged') : t('admin.conversations.isolated') }}</span>
+                    <span class="mt-1 block text-xs text-gray-400">{{ mergeLabel(item.merge_source) }}</span>
                   </button>
                 </td>
                 <td class="px-5 py-4 text-sm">
@@ -59,7 +59,7 @@
                 </td>
                 <td class="px-5 py-4 font-mono text-xs text-gray-600 dark:text-gray-300">{{ item.last_model || '-' }}</td>
                 <td class="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{{ item.request_count }}</td>
-                <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{{ formatNumber(item.total_input_tokens) }} / {{ formatNumber(item.total_output_tokens) }}</td>
+                <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{{ formatNumber(item.last_input_tokens) }} / {{ formatNumber(item.last_output_tokens) }}</td>
                 <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{{ formatTime(item.last_request_at) }}</td>
                 <td class="px-5 py-4 text-right">
                   <button class="icon-button" :title="t('common.view')" @click="openDetail(item.id)"><Icon name="eye" size="sm" /></button>
@@ -81,7 +81,12 @@
           <div><span class="text-gray-400">{{ t('admin.conversations.model') }}</span><div class="mt-1 break-all font-mono text-xs text-gray-900 dark:text-white">{{ detail.session.last_model || '-' }}</div></div>
         </div>
 
-        <div v-for="request in detail.requests" :key="request.id" class="border-b border-gray-100 pb-5 last:border-b-0 dark:border-dark-700">
+        <div v-if="detail.requests.length > 1" class="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm dark:bg-dark-700/50">
+          <span class="text-gray-600 dark:text-gray-300">{{ t('admin.conversations.attempts', { count: detail.requests.length }) }}</span>
+          <button class="btn btn-ghost btn-sm" @click="showAllAttempts = !showAllAttempts">{{ showAllAttempts ? t('admin.conversations.hideAttempts') : t('admin.conversations.showAttempts') }}</button>
+        </div>
+
+        <div v-for="request in visibleRequests" :key="request.id" class="border-b border-gray-100 pb-5 last:border-b-0 dark:border-dark-700">
           <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div class="flex flex-wrap items-center gap-2 text-gray-500 dark:text-gray-400">
               <span :class="request.status === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">{{ request.http_status }} {{ request.status }}</span>
@@ -122,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -143,6 +148,7 @@ const detailVisible = ref(false)
 const confirmDelete = ref(false)
 const sessions = ref<ConversationSession[]>([])
 const detail = ref<ConversationDetail | null>(null)
+const showAllAttempts = ref(false)
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
@@ -179,6 +185,7 @@ function changePageSize(value: number) { pageSize.value = value; page.value = 1;
 async function openDetail(id: number) {
   detailVisible.value = true
   detailLoading.value = true
+  showAllAttempts.value = false
   try {
     detail.value = await conversationsAPI.get(id)
   } catch (error: any) {
@@ -218,6 +225,16 @@ async function removeCurrent() {
 
 function formatTime(value: string) { return new Intl.DateTimeFormat(locale.value, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) }
 function formatNumber(value: number) { return new Intl.NumberFormat(locale.value, { notation: 'compact' }).format(value || 0) }
+function mergeLabel(source: string) {
+  if (source === 'history') return t('admin.conversations.merged')
+  if (source === 'duplicate') return t('admin.conversations.duplicate')
+  return t('admin.conversations.isolated')
+}
+
+const visibleRequests = computed(() => {
+  if (!detail.value?.requests.length) return []
+  return showAllAttempts.value ? detail.value.requests : detail.value.requests.slice(-1)
+})
 
 onMounted(load)
 </script>

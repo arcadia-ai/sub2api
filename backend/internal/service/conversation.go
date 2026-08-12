@@ -61,6 +61,8 @@ type ConversationSession struct {
 	FirstRequestAt    time.Time `json:"first_request_at"`
 	LastRequestAt     time.Time `json:"last_request_at"`
 	LastStatus        string    `json:"last_status"`
+	LastInputTokens   int64     `json:"last_input_tokens"`
+	LastOutputTokens  int64     `json:"last_output_tokens"`
 }
 type ConversationRequest struct {
 	ID                int64                 `json:"id"`

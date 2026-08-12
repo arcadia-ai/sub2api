@@ -24,11 +24,36 @@ func (r *ConversationRepository) Save(ctx context.Context, item *service.Convers
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	requestJSON, err := json.Marshal(item.NormalizedRequest)
+	if err != nil {
+		return err
+	}
 
 	var sessionID int64
 	var parentID sql.NullInt64
 	mergeSource := "isolated"
-	if item.HistoryHash != "" {
+	if len(item.NormalizedRequest) > 0 {
+		_, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(
+			concat_ws('|',$1,$2,$3,$4,md5($5::jsonb::text)),0))`, item.UserID, item.APIKeyID,
+			item.Endpoint, item.RequestedModel, string(requestJSON))
+		if err != nil {
+			return err
+		}
+		err = tx.QueryRowContext(ctx, `SELECT r.session_id FROM conversation_requests r
+			JOIN conversation_sessions s ON s.id=r.session_id
+			WHERE r.user_id=$1 AND r.api_key_id=$2 AND r.endpoint=$3 AND r.requested_model=$4
+			AND r.request_fingerprint=md5($5::jsonb::text) AND r.started_at >= $6 - INTERVAL '10 minutes'
+			AND r.started_at <= $6 AND s.deleted_at IS NULL
+			ORDER BY r.started_at DESC,r.id DESC LIMIT 1`, item.UserID, item.APIKeyID, item.Endpoint,
+			item.RequestedModel, string(requestJSON), item.StartedAt).Scan(&sessionID)
+		if err == nil {
+			mergeSource = "duplicate"
+		}
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
+	if sessionID == 0 && item.HistoryHash != "" {
 		err = tx.QueryRowContext(ctx, `WITH matches AS (
 			SELECT r.session_id,r.id,r.completed_at FROM conversation_requests r
 			JOIN conversation_sessions s ON s.id=r.session_id
@@ -62,10 +87,6 @@ func (r *ConversationRepository) Save(ctx context.Context, item *service.Convers
 		}
 	}
 
-	requestJSON, err := json.Marshal(item.NormalizedRequest)
-	if err != nil {
-		return err
-	}
 	responseJSON, err := json.Marshal(item.NormalizedResponse)
 	if err != nil {
 		return err
@@ -73,10 +94,10 @@ func (r *ConversationRepository) Save(ctx context.Context, item *service.Convers
 	var requestID int64
 	err = tx.QueryRowContext(ctx, `INSERT INTO conversation_requests
 		(request_uuid,session_id,parent_request_id,user_id,api_key_id,provider,endpoint,requested_model,stream,status,http_status,
-		history_hash,result_hash,input_tokens,output_tokens,duration_ms,request_truncated,response_truncated,started_at,completed_at)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,''),NULLIF($13,''),$14,$15,$16,$17,$18,$19,$20) RETURNING id`,
+		history_hash,result_hash,request_fingerprint,input_tokens,output_tokens,duration_ms,request_truncated,response_truncated,started_at,completed_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,''),NULLIF($13,''),md5($14::jsonb::text),$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
 		item.RequestUUID, sessionID, nullableInt64(parentID), item.UserID, item.APIKeyID, item.Provider, item.Endpoint,
-		item.RequestedModel, item.Stream, item.Status, item.HTTPStatus, item.HistoryHash, item.ResultHash, item.InputTokens,
+		item.RequestedModel, item.Stream, item.Status, item.HTTPStatus, item.HistoryHash, item.ResultHash, string(requestJSON), item.InputTokens,
 		item.OutputTokens, item.DurationMS, item.RequestTruncated, item.ResponseTruncated, item.StartedAt, item.CompletedAt).Scan(&requestID)
 	if err != nil {
 		return err
@@ -128,7 +149,7 @@ func (r *ConversationRepository) List(ctx context.Context, filter *service.Conve
 		add("s.last_request_at <= $%d", *filter.EndTime)
 	}
 	base := ` FROM conversation_sessions s JOIN users u ON u.id=s.user_id LEFT JOIN api_keys k ON k.id=s.api_key_id
-		LEFT JOIN LATERAL (SELECT status FROM conversation_requests r WHERE r.session_id=s.id ORDER BY r.started_at DESC LIMIT 1) lr ON TRUE
+		LEFT JOIN LATERAL (SELECT status,input_tokens,output_tokens FROM conversation_requests r WHERE r.session_id=s.id ORDER BY r.started_at DESC,r.id DESC LIMIT 1) lr ON TRUE
 		WHERE ` + strings.Join(where, " AND ")
 	var total int64
 	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(*)"+base, args...).Scan(&total); err != nil {
@@ -137,7 +158,7 @@ func (r *ConversationRepository) List(ctx context.Context, filter *service.Conve
 	args = append(args, filter.PageSize, (filter.Page-1)*filter.PageSize)
 	query := `SELECT s.id,s.session_uuid::text,s.user_id,u.email,s.api_key_id,COALESCE(k.name,''),s.title,s.first_model,
 		s.last_model,s.merge_source,s.request_count,s.total_input_tokens,s.total_output_tokens,s.first_request_at,s.last_request_at,
-		COALESCE(lr.status,'')` + base + fmt.Sprintf(" ORDER BY s.last_request_at DESC LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+		COALESCE(lr.status,''),COALESCE(lr.input_tokens,0),COALESCE(lr.output_tokens,0)` + base + fmt.Sprintf(" ORDER BY s.last_request_at DESC LIMIT $%d OFFSET $%d", len(args)-1, len(args))
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
@@ -148,7 +169,7 @@ func (r *ConversationRepository) List(ctx context.Context, filter *service.Conve
 		var item service.ConversationSession
 		if err := rows.Scan(&item.ID, &item.SessionUUID, &item.UserID, &item.UserEmail, &item.APIKeyID, &item.APIKeyName, &item.Title,
 			&item.FirstModel, &item.LastModel, &item.MergeSource, &item.RequestCount, &item.TotalInputTokens, &item.TotalOutputTokens,
-			&item.FirstRequestAt, &item.LastRequestAt, &item.LastStatus); err != nil {
+			&item.FirstRequestAt, &item.LastRequestAt, &item.LastStatus, &item.LastInputTokens, &item.LastOutputTokens); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, item)
@@ -170,7 +191,7 @@ func (r *ConversationRepository) Get(ctx context.Context, id int64) (*service.Co
 	rows, err := r.db.QueryContext(ctx, `SELECT r.id,r.request_uuid::text,r.session_id,r.parent_request_id,r.provider,r.endpoint,
 		r.requested_model,r.stream,r.status,r.http_status,r.input_tokens,r.output_tokens,r.duration_ms,r.request_truncated,
 		r.response_truncated,r.started_at,r.completed_at,COALESCE(p.normalized_request,'[]'::jsonb),COALESCE(p.normalized_response,'[]'::jsonb)
-		FROM conversation_requests r LEFT JOIN conversation_payloads p ON p.request_id=r.id WHERE r.session_id=$1 ORDER BY r.started_at`, id)
+		FROM conversation_requests r LEFT JOIN conversation_payloads p ON p.request_id=r.id WHERE r.session_id=$1 ORDER BY r.started_at,r.id`, id)
 	if err != nil {
 		return nil, nil, err
 	}

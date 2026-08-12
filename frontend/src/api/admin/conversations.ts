@@ -25,6 +25,8 @@ export interface ConversationSession {
   first_request_at: string
   last_request_at: string
   last_status: string
+  last_input_tokens: number
+  last_output_tokens: number
 }
 
 export interface ConversationRequest {
