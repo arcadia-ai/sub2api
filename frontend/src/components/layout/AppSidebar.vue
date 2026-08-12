@@ -277,6 +277,21 @@ const DashboardIcon = {
     )
 }
 
+const ConversationIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M8.625 12h.008v.008h-.008V12zm3.375 0h.008v.008H12V12zm3.375 0h.008v.008h-.008V12zM21 12c0 4.142-4.03 7.5-9 7.5a10.1 10.1 0 01-2.53-.317A6.01 6.01 0 015.25 20.25a4.49 4.49 0 001.03-2.14C4.27 16.74 3 14.55 3 12c0-4.142 4.03-7.5 9-7.5s9 3.358 9 7.5z'
+        })
+      ]
+    )
+}
+
 const KeyIcon = {
   render: () =>
     h(
@@ -811,6 +826,7 @@ const adminNavItems = computed((): NavItem[] => {
       ],
     },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
+    { path: '/admin/conversations', label: t('nav.conversations'), icon: ConversationIcon },
     { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
   ]
 

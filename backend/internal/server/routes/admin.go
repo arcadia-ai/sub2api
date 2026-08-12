@@ -121,6 +121,20 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+
+		// 对话归档，仅管理员可见。
+		registerConversationRoutes(admin, h)
+	}
+}
+
+func registerConversationRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	conversations := admin.Group("/conversations")
+	{
+		conversations.GET("", h.Admin.Conversation.List)
+		conversations.GET("/:id", h.Admin.Conversation.Get)
+		conversations.DELETE("/:id", h.Admin.Conversation.Delete)
+		conversations.GET("/requests/:id/raw-request", h.Admin.Conversation.RawRequest)
+		conversations.GET("/requests/:id/raw-response", h.Admin.Conversation.RawResponse)
 	}
 }
 

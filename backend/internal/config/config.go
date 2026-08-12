@@ -90,6 +90,7 @@ type Config struct {
 	Dashboard               DashboardCacheConfig          `mapstructure:"dashboard_cache"`
 	DashboardAgg            DashboardAggregationConfig    `mapstructure:"dashboard_aggregation"`
 	UsageCleanup            UsageCleanupConfig            `mapstructure:"usage_cleanup"`
+	ConversationStorage     ConversationStorageConfig     `mapstructure:"conversation_storage"`
 	Concurrency             ConcurrencyConfig             `mapstructure:"concurrency"`
 	TokenRefresh            TokenRefreshConfig            `mapstructure:"token_refresh"`
 	RunMode                 string                        `mapstructure:"run_mode" yaml:"run_mode"`
@@ -99,6 +100,19 @@ type Config struct {
 	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
+}
+
+type ConversationStorageConfig struct {
+	Enabled                bool `mapstructure:"enabled"`
+	QueueSize              int  `mapstructure:"queue_size"`
+	WorkerCount            int  `mapstructure:"worker_count"`
+	MaxRequestBytes        int  `mapstructure:"max_request_bytes"`
+	MaxResponseBytes       int  `mapstructure:"max_response_bytes"`
+	RawSuccessDays         int  `mapstructure:"raw_success_days"`
+	RawFailedDays          int  `mapstructure:"raw_failed_days"`
+	NormalizedTextDays     int  `mapstructure:"normalized_text_days"`
+	CleanupIntervalMinutes int  `mapstructure:"cleanup_interval_minutes"`
+	CleanupBatchSize       int  `mapstructure:"cleanup_batch_size"`
 }
 
 type LogConfig struct {
@@ -2453,6 +2467,16 @@ func setDefaults() {
 	// Subscription Maintenance (bounded queue + worker pool)
 	viper.SetDefault("subscription_maintenance.worker_count", 2)
 	viper.SetDefault("subscription_maintenance.queue_size", 1024)
+	viper.SetDefault("conversation_storage.enabled", true)
+	viper.SetDefault("conversation_storage.queue_size", 2000)
+	viper.SetDefault("conversation_storage.worker_count", 1)
+	viper.SetDefault("conversation_storage.max_request_bytes", 33554432)
+	viper.SetDefault("conversation_storage.max_response_bytes", 33554432)
+	viper.SetDefault("conversation_storage.raw_success_days", 400)
+	viper.SetDefault("conversation_storage.raw_failed_days", 180)
+	viper.SetDefault("conversation_storage.normalized_text_days", 730)
+	viper.SetDefault("conversation_storage.cleanup_interval_minutes", 60)
+	viper.SetDefault("conversation_storage.cleanup_batch_size", 500)
 
 	setEnvReachableDefaults()
 }
@@ -3124,6 +3148,20 @@ func (c *Config) Validate() error {
 		}
 		if c.UsageCleanup.TaskTimeoutSeconds < 0 {
 			return fmt.Errorf("usage_cleanup.task_timeout_seconds must be non-negative")
+		}
+	}
+	if c.ConversationStorage.Enabled {
+		if c.ConversationStorage.QueueSize <= 0 || c.ConversationStorage.WorkerCount <= 0 {
+			return fmt.Errorf("conversation_storage.queue_size and worker_count must be positive")
+		}
+		if c.ConversationStorage.MaxRequestBytes <= 0 || c.ConversationStorage.MaxResponseBytes <= 0 {
+			return fmt.Errorf("conversation_storage capture byte limits must be positive")
+		}
+		if c.ConversationStorage.RawSuccessDays <= 0 || c.ConversationStorage.RawFailedDays <= 0 || c.ConversationStorage.NormalizedTextDays <= 0 {
+			return fmt.Errorf("conversation_storage retention days must be positive")
+		}
+		if c.ConversationStorage.CleanupIntervalMinutes <= 0 || c.ConversationStorage.CleanupBatchSize <= 0 {
+			return fmt.Errorf("conversation_storage cleanup settings must be positive")
 		}
 	}
 	if c.Idempotency.DefaultTTLSeconds <= 0 {

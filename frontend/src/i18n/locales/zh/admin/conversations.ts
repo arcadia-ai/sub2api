@@ -1,0 +1,30 @@
+export default {
+  conversations: {
+    title: '对话记录',
+    description: '查看所有用户通过文本接口产生的对话与原始请求响应',
+    searchPlaceholder: '搜索标题或用户邮箱',
+    modelPlaceholder: '模型名称',
+    allStatus: '全部状态',
+    success: '成功',
+    failed: '失败',
+    empty: '暂无对话记录',
+    user: '用户',
+    apiKey: 'API 密钥',
+    model: '模型',
+    requests: '请求数',
+    tokens: 'Token',
+    updatedAt: '最后请求',
+    detail: '对话详情',
+    merged: '已根据历史记录合并',
+    isolated: '独立请求',
+    noText: '该请求没有可展示的文本',
+    rawRequest: '下载原始请求',
+    rawResponse: '下载原始响应',
+    deleteTitle: '删除对话记录',
+    deleteMessage: '此操作会永久删除该会话及其原始请求响应，确定继续吗？',
+    deleted: '对话记录已删除',
+    loadFailed: '加载对话记录失败',
+    downloadFailed: '下载原始数据失败',
+    truncated: '归档内容已达到保存上限'
+  }
+}

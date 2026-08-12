@@ -1,0 +1,30 @@
+export default {
+  conversations: {
+    title: 'Conversations',
+    description: 'Review text conversations and raw request/response archives for all users',
+    searchPlaceholder: 'Search title or user email',
+    modelPlaceholder: 'Model name',
+    allStatus: 'All statuses',
+    success: 'Success',
+    failed: 'Failed',
+    empty: 'No conversation records',
+    user: 'User',
+    apiKey: 'API key',
+    model: 'Model',
+    requests: 'Requests',
+    tokens: 'Tokens',
+    updatedAt: 'Last request',
+    detail: 'Conversation detail',
+    merged: 'Merged from request history',
+    isolated: 'Isolated request',
+    noText: 'No displayable text for this request',
+    rawRequest: 'Download raw request',
+    rawResponse: 'Download raw response',
+    deleteTitle: 'Delete conversation',
+    deleteMessage: 'This permanently deletes the session and its raw payloads. Continue?',
+    deleted: 'Conversation deleted',
+    loadFailed: 'Failed to load conversations',
+    downloadFailed: 'Failed to download raw data',
+    truncated: 'Archived content reached the configured limit'
+  }
+}
