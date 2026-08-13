@@ -18,14 +18,14 @@ func TestConversationSavePrefersRecentDuplicate(t *testing.T) {
 
 	now := time.Now()
 	item := &service.ConversationCapture{
-		RequestUUID:    "47ccb639-615c-42d3-8cd6-6045700e954e",
-		UserID:         9,
-		APIKeyID:       12,
-		Endpoint:       "/responses",
-		RequestedModel: "gpt-test",
-		HistoryHash:    "history-hash",
-		StartedAt:      now,
-		CompletedAt:    now,
+		RequestUUID:       "47ccb639-615c-42d3-8cd6-6045700e954e",
+		UserID:            9,
+		APIKeyID:          12,
+		Endpoint:          "/responses",
+		RequestedModel:    "gpt-test",
+		HistoryHash:       "history-hash",
+		StartedAt:         now,
+		CompletedAt:       now,
 		NormalizedRequest: []service.ConversationMessage{{Role: "user", Text: "same request"}},
 	}
 
